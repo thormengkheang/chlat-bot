@@ -43,14 +43,14 @@ async function isBotComment(context: IssueContext) {
     return comments.some((e) => e.name === BOT_NAME && e.type === 'Bot');
 }
 
-async function addIssueToProject(context: IssueContext, projectId: string, addProjectLabels: string[]) {
+async function addIssueToProject(context: IssueContext, projectId: string, labels: string[]) {
     if (!projectId) {
         context.log.warn('No PROJECT_ID set in .github/config.yml');
         return;
     }
-    const labels = context.payload.issue.labels;
+    const issueLabels = context.payload.issue.labels;
     const nodeId = context.payload.issue.node_id;
-    const index = labels.findIndex((e) => addProjectLabels.includes(e.name));
+    const index = issueLabels.findIndex((e) => labels.includes(e.name));
     if (index != -1) {
         try {
             await context.octokit.graphql(ADD_ISSUE_TO_PROJECT, {
@@ -105,7 +105,7 @@ async function commentIssue(context: IssueContext, branchName: string) {
 
 async function getConfig(context: IssueContext) {
     const defaultConfig = {
-        ADD_PROJECT_LABELS: ['bug', 'enhancement'],
+        LABELS: ['bug', 'enhancement'],
         PROJECT_ID: '',
         BASE_BRANCH: '',
     };
@@ -121,18 +121,29 @@ async function getConfig(context: IssueContext) {
     return config;
 }
 
+function isIssueNotInLabel(context: IssueContext, labels: string[]) {
+    const issueLabels = context.payload.issue.labels;
+    const index = issueLabels.findIndex((e) => labels.includes(e.name));
+    return index === -1;
+}
+
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export = (app: Probot) => {
     app.on('issues.labeled', async (context) => {
         // Load config from .github/config.yml in the repository and combine with default config
         const config = await getConfig(context);
+
+        if (isIssueNotInLabel(context, config.LABELS)) {
+            return;
+        }
+
         const isBotCommented = await isBotComment(context);
         if (isBotCommented) {
             context.log.info('Bot already commented on this issue');
             return;
         }
 
-        await addIssueToProject(context, config.PROJECT_ID, config.ADD_PROJECT_LABELS);
+        await addIssueToProject(context, config.PROJECT_ID, config.LABELS);
 
         const baseBranchSha = await getBranchSha(context, config.BASE_BRANCH);
 
