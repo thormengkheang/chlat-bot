@@ -67,7 +67,10 @@ async function createBranch(context: IssueContext, sha: string) {
     const owner = context.repo().owner;
     const repo = context.repo().repo;
     const issue = context.payload.issue;
-    const branchName = slugify(`${issue.number} ${issue.title.toLowerCase().replace(/['"]+/g, '')}`, '_').substring(0, BRANCH_NAME_MAX_CHAR);
+    const branchName = slugify(`${issue.number} ${issue.title.toLowerCase().replace(/[^\w\s]/gi, '')}`, '_').substring(
+        0,
+        BRANCH_NAME_MAX_CHAR,
+    );
     await context.octokit.request('POST /repos/{owner}/{repo}/git/refs', {
         owner,
         repo,
